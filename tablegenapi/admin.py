@@ -1,8 +1,7 @@
 from django.contrib import admin
 from django.utils.safestring import mark_safe
-
 from tablegenapi.UserModel import User
-from tablegenapi.models import Student, Teacher, Group, StudyDirection, Faculty, Discipline
+from tablegenapi.models import Student, Teacher, Group, StudyDirection, Faculty, Table, Grade
 # from authentication_part.models import User
 # Register your models here.
 
@@ -43,10 +42,7 @@ class AdminStudyDirection(admin.ModelAdmin):
         return mark_safe(to_return)
 
 
-admin.site.register(Faculty)
-
-
-@admin.register(Discipline)
+'''@admin.register(Discipline)
 class AdminDiscipline(admin.ModelAdmin):
     list_display = ('name', 'groups_with_discipline')
 
@@ -55,7 +51,9 @@ class AdminDiscipline(admin.ModelAdmin):
         # I'm assuming that there is a name field under the event.Product model. If not change accordingly.
         to_return += '\n'.join('<li>{}</li>'.format(group.number) for group in obj.groups.all())
         to_return += '</ul>'
-        return mark_safe(to_return)
+        return mark_safe(to_return)'''
 
 
-# admin.site.register(User)
+admin.site.register(Faculty)
+admin.site.register(Table)
+admin.site.register(Grade)
