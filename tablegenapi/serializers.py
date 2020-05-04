@@ -84,20 +84,28 @@ class UserSerializer(serializers.ModelSerializer):
         extra_kwargs = {'password': {'required': True, 'write_only': True}}
 
 
-class TableSerializer(serializers.ModelSerializer):
-    table_group = GroupSerializer()
-    table_teacher = TeacherSerializer(fields=['first_name', 'middle_name', 'last_name'])
-    # table_teacher = TeacherSerializer(fields=['first_name', 'middle_name', 'last_name'])
-
-    class Meta:
-        model = Table
-        fields = ('id', 'table_name', 'table_group', 'table_teacher')
-
-
-class GradeSerializer(serializers.ModelSerializer):
+class GradeSerializer(DynamicFieldsModelSerializer):
     grade_student = StudentSerializer()
-    grade_table = TableSerializer()
+    # grade_table = TableSerializer()
 
     class Meta:
         model = Grade
         fields = ('id', 'grade_student', 'grade_table', 'grade_type', 'grade_value')
+
+
+class CustomTableGradesSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    fio = serializers.CharField(max_length=300)
+    grades = GradeSerializer(many=True, fields=['grade_type', 'grade_value'])
+
+
+class TableSerializer(DynamicFieldsModelSerializer):
+    table_group = GroupSerializer()
+    table_teacher = TeacherSerializer(fields=['first_name', 'middle_name', 'last_name'])
+    # table_teacher = TeacherSerializer(fields=['first_name', 'middle_name', 'last_name'])
+    students_w_grades_in_table = CustomTableGradesSerializer(many=True)
+
+    class Meta:
+        model = Table
+        fields = ('id', 'table_name', 'table_group', 'table_teacher', 'students_w_grades_in_table')
+

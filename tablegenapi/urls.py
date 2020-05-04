@@ -19,5 +19,6 @@ urlpatterns = [
     path('user_info/', UserInfoView.as_view()),
     path('groups_by_direct/<str:studying_direct_name>/', GroupsByDirectView.as_view()),
 
-    path('table_creator/', TableCreatorView.as_view())
+    path('table_creator/<int:table_id>/', TableCreatorView.as_view()),
+    path('table_creator/', TableCreatorView.as_view()),
 ]

@@ -154,8 +154,10 @@ class GroupsByDirectView(views.APIView):
 class TableCreatorView(views.APIView):
     permission_classes = (IsAuthenticated,)
 
-    def get(self, request):
-        pass
+    def get(self, request, table_id):
+        table = Table.objects.get(id=table_id)
+        table_data = TableSerializer(table, fields=['students_w_grades_in_table']).data
+        return Response({'result': 'ok', 'params': {'table_data': table_data}})
 
     def post(self, request, format=None):
         user = request.user
@@ -166,8 +168,6 @@ class TableCreatorView(views.APIView):
             return Response({'result': 'ok', 'params': {'directions_names': serializer.data}})
 
         if request.data['action'] == 'create_new':
-            # token = request.data['params']['author-token']
-            # user = Token.objects.get(key=token).user
             table_group_number = request.data['params']['group_number']
             table_name = request.data['params']['new_table_name']
             table_author = Teacher.objects.get(user=user)
@@ -178,16 +178,18 @@ class TableCreatorView(views.APIView):
             for student in students_in_table:
                 final_grade = Grade.objects.create(grade_student=student, grade_table=new_table, grade_type='fin',
                                                    grade_value=None)
-            serializer = StudentSerializer(students_in_table, many=True)
-            return Response({'result': 'ok',
-                             'params': {'students': serializer.data}})
+            # serializer = StudentSerializer(students_in_table, many=True)
+            # return Response({'result': 'ok',
+            #                  'params': {'students': serializer.data}})
+            table_data = TableSerializer(new_table, fields=['students_w_grades_in_table'])
+            # grades_in_table = new_table.grade_set.all()
+
+            return Response({'result': 'ok', 'params': {'table_data': table_data}})
 
         if request.data['action'] == 'get_all':
-            # token = request.data['params']['author-token']
-            # user = Token.objects.get(key=token).user
             table_author = Teacher.objects.get(user=user)
             all_author_tables = Table.objects.filter(table_teacher=table_author)
-            serializer = TableSerializer(all_author_tables, many=True)
+            serializer = TableSerializer(all_author_tables, many=True, fields=['id', 'table_name', 'table_group'])
             return Response({'result': 'ok', 'params': {'all_author_tables': serializer.data} })
 
         if request.data['action'] == 'delete_table':

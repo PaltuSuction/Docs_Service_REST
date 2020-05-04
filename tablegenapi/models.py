@@ -181,8 +181,17 @@ class Table(models.Model):
                                      self.table_teacher.user.middle_name)
         super(Table, self).save(*args, **kwargs)
 
-    def students_in_table(self):
-        students = Student.objects.filter()
+    def students_w_grades_in_table(self):
+        data = []
+        students_in_table = self.table_group.students_in_group()
+        teacher = self.table_teacher
+        for student in students_in_table:
+            student_grades = self.grade_set.filter(grade_student=student, grade_table=self)
+            data.append({'id': student.id,
+                         'fio': student.user.last_name + ' ' + student.user.first_name + ' ' + student.user.middle_name,
+                         'grades': student_grades})
+        return data
+
 
 
 class Grade(models.Model):
