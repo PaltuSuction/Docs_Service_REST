@@ -47,6 +47,14 @@ class FacultyViewSet(viewsets.ModelViewSet):
     permission_classes = (IsAuthenticated,)
     parser_classes = (FormParser, MultiPartParser)
 
+    def list(self, request, *args, **kwargs):
+        try:
+            all_faculties = Faculty.objects.all()
+            faculty_serializer = FacultySerializer(all_faculties, many=True, fields=['name', 'excel_file'])
+            return Response({'result': 'ok', 'params': {'faculties': faculty_serializer.data}})
+        except:
+            return Response({'result': 'error', 'params': {'message': 'Faculty list creation error'}})
+
     def perform_create(self, serializer):
         file_obj = serializer.validated_data['excel_file']
         faculty, created = Faculty.objects.update_or_create(
@@ -156,7 +164,7 @@ class TableCreatorView(views.APIView):
 
     def get(self, request, table_id):
         table = Table.objects.get(id=table_id)
-        table_data = TableSerializer(table, fields=['students_w_grades_in_table']).data
+        table_data = TableSerializer(table, fields=['id', 'students_and_grades', 'grades_types']).data
         return Response({'result': 'ok', 'params': {'table_data': table_data}})
 
     def post(self, request, format=None):
@@ -176,20 +184,15 @@ class TableCreatorView(views.APIView):
             new_table.save()
             students_in_table = table_group.students_in_group()
             for student in students_in_table:
-                final_grade = Grade.objects.create(grade_student=student, grade_table=new_table, grade_type='fin',
+                final_grade = Grade.objects.create(grade_student=student, grade_table=new_table, grade_type='Итог',
                                                    grade_value=None)
-            # serializer = StudentSerializer(students_in_table, many=True)
-            # return Response({'result': 'ok',
-            #                  'params': {'students': serializer.data}})
-            table_data = TableSerializer(new_table, fields=['students_w_grades_in_table'])
-            # grades_in_table = new_table.grade_set.all()
-
+            table_data = TableSerializer(new_table, fields=['id', 'students_and_grades', 'grades_types']).data
             return Response({'result': 'ok', 'params': {'table_data': table_data}})
 
         if request.data['action'] == 'get_all':
             table_author = Teacher.objects.get(user=user)
             all_author_tables = Table.objects.filter(table_teacher=table_author)
-            serializer = TableSerializer(all_author_tables, many=True, fields=['id', 'table_name', 'table_group'])
+            serializer = TableSerializer(all_author_tables, many=True, fields=['id', 'table_name', 'table_group_number'])
             return Response({'result': 'ok', 'params': {'all_author_tables': serializer.data} })
 
         if request.data['action'] == 'delete_table':
@@ -199,4 +202,31 @@ class TableCreatorView(views.APIView):
             except:
                 return Response({'result': 'error', 'params': {'message': 'Could not identify table'}})
             table.delete()
+            return Response({'result': 'ok'})
+
+        if request.data['action'] == 'add_column':
+            table_id = request.data['params']['table_id']
+            if not table_id: return Response({'result': 'error', 'params': {'message': 'No ID'}})
+            new_column_type = request.data['params']['column_type']
+            if not new_column_type: return Response({'result': 'error', 'params': {'message': 'No column type'}})
+            table = Table.objects.get(id=table_id)
+            if not table: return Response({'result': 'error', 'params': {'message': 'No table with such ID'}})
+            students_in_table = table.table_group.students_in_group()
+            new_grades = {}
+            for student in students_in_table:
+                new_grade = Grade.objects.create(grade_student=student, grade_table=table, grade_type=new_column_type,
+                                                 grade_value=None)
+                new_grades[student.id] = {'id': new_grade.id, 'grade_value': new_grade.grade_value}
+            return Response({'result': 'ok', 'params': {'new_grades': new_grades}})
+
+        if request.data['action'] == 'delete_column':
+            table_id = request.data['params']['table_id']
+            if not table_id: return Response({'result': 'error', 'params': {'message': 'No ID'}})
+            grades_ids = request.data['params']['grades_ids']
+            if not grades_ids: return Response({'result': 'error', 'params': {'message': 'No grades IDs'}})
+            table = Table.objects.get(id=table_id)
+            grades_in_table = table.grade_set
+            grades_to_delete = grades_in_table.filter(id__in=grades_ids)
+            for grade in grades_to_delete:
+                grade.delete()
             return Response({'result': 'ok'})

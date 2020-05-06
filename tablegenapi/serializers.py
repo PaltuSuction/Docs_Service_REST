@@ -96,16 +96,17 @@ class GradeSerializer(DynamicFieldsModelSerializer):
 class CustomTableGradesSerializer(serializers.Serializer):
     id = serializers.IntegerField()
     fio = serializers.CharField(max_length=300)
-    grades = GradeSerializer(many=True, fields=['grade_type', 'grade_value'])
+    grades = GradeSerializer(many=True, fields=['id', 'grade_type', 'grade_value'])
 
 
 class TableSerializer(DynamicFieldsModelSerializer):
     table_group = GroupSerializer()
     table_teacher = TeacherSerializer(fields=['first_name', 'middle_name', 'last_name'])
     # table_teacher = TeacherSerializer(fields=['first_name', 'middle_name', 'last_name'])
-    students_w_grades_in_table = CustomTableGradesSerializer(many=True)
+    # students_and_grades = CustomTableGradesSerializer(many=True)
 
     class Meta:
         model = Table
-        fields = ('id', 'table_name', 'table_group', 'table_teacher', 'students_w_grades_in_table')
+        fields = ('id', 'table_name', 'table_group_number', 'table_group', 'table_teacher', 'students_and_grades',
+                  'grades_types')
 

@@ -1,6 +1,8 @@
 from django.db import models
 
 # Create your models here.
+from django.db.models import Count
+
 from Docs_Service_REST_v2 import settings
 from tablegenapi.UserModel import User
 
@@ -181,17 +183,39 @@ class Table(models.Model):
                                      self.table_teacher.user.middle_name)
         super(Table, self).save(*args, **kwargs)
 
-    def students_w_grades_in_table(self):
+    def table_group_number(self):
+        return self.table_group.number
+
+    def students_and_grades(self):
         data = []
         students_in_table = self.table_group.students_in_group()
         teacher = self.table_teacher
+        grades_types = self.grades_types()
         for student in students_in_table:
+            student_grades_dict = []
+            student_grades_data = {}
             student_grades = self.grade_set.filter(grade_student=student, grade_table=self)
+            for grade_type in grades_types:
+                student_grades_data[grade_type] = []
+                for grade in student_grades:
+                    if grade_type == grade.grade_type:
+                        student_grades_data[grade_type].append({'id': grade.id, 'grade_value': grade.grade_value})
+
             data.append({'id': student.id,
                          'fio': student.user.last_name + ' ' + student.user.first_name + ' ' + student.user.middle_name,
-                         'grades': student_grades})
+                         # 'grades': student_grades})
+                         'grades': student_grades_data})
         return data
 
+    def grades_types(self):
+        grades_in_table = self.grade_set
+        grades_types = grades_in_table.values('grade_type').order_by('grade_type').annotate(Count('grade_type'))
+        students_num_in_group = self.table_group.student_set.count()
+        for type in grades_types:
+            type['grade_type__count'] = type['grade_type__count'] / students_num_in_group
+
+        grades_types_dict = {type['grade_type'] : int(type['grade_type__count']) for type in grades_types}
+        return grades_types_dict
 
 
 class Grade(models.Model):
@@ -201,10 +225,11 @@ class Grade(models.Model):
     '''
     grade_student = models.ForeignKey('Student', on_delete=models.CASCADE, verbose_name='Студент с оценкой')
     grade_table = models.ForeignKey('Table', on_delete=models.CASCADE, verbose_name='Таблица для оценки')
-    grade_type = models.CharField(max_length=10, verbose_name='Тип оценки', help_text='Укажите тип оценки',
+    grade_type = models.CharField(max_length=100, verbose_name='Тип оценки', help_text='Укажите тип оценки',
                                   default='test')
     grade_value = models.CharField(max_length=20, verbose_name='Значение оценки', help_text='Укажите значение оценки', null=True)
 
     class Meta:
         verbose_name = 'Оценка студента'
         verbose_name_plural = 'Оценки студента'
+        ordering = ['grade_type']
