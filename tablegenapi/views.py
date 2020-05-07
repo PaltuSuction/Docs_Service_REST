@@ -230,3 +230,14 @@ class TableCreatorView(views.APIView):
             for grade in grades_to_delete:
                 grade.delete()
             return Response({'result': 'ok'})
+
+        if request.data['action'] == 'save_table':
+            table_id = request.data['params']['table_id']
+            grades_to_save = request.data['params']['all_grades']
+            if not table_id: return Response({'result': 'error', 'params': {'message': 'No ID'}})
+            table = Table.objects.get(id=table_id)
+            grades_in_table = Grade.objects.filter(grade_table=table)
+            for grade in grades_in_table:
+                grade.grade_value = grades_to_save[str(grade.id)]
+                grade.save()
+            return Response({'result': 'ok'})

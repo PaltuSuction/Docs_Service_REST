@@ -118,27 +118,6 @@ class StudyDirection(models.Model):
 
 
 class Faculty(models.Model):
-    FKTI = 'FKTI'
-    INPROTECH = 'INPROTECH'
-    FRT = 'FRT'
-    FEL = 'FEL'
-    IFIO = 'IFIO'
-    FEA = 'FEA'
-    FIBS = 'FIBS'
-    GF = 'GF'
-    RY = 'RY'
-    all_faculty_names = (
-        (FKTI, 'ФКТИ'),
-        (INPROTECH, 'ИНПРОТЕХ'),
-        (FRT, 'ФРТ'),
-        (FEL, 'ФЭЛ'),
-        (IFIO, 'ИФИО'),
-        (FEA, 'ФЭА'),
-        (FIBS, 'ФИБС'),
-        (GF, 'ГФ'),
-        (RY, 'РЯ')
-    )
-
     name = models.CharField(max_length=300, verbose_name='Факультет', help_text='Факультет')
     excel_file = models.FileField(upload_to='files', blank=True, null=True, verbose_name='Файл - список студентов')
 
