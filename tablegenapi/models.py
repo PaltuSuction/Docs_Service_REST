@@ -168,10 +168,8 @@ class Table(models.Model):
     def students_and_grades(self):
         data = []
         students_in_table = self.table_group.students_in_group()
-        teacher = self.table_teacher
         grades_types = self.grades_types()
         for student in students_in_table:
-            student_grades_dict = []
             student_grades_data = {}
             student_grades = self.grade_set.filter(grade_student=student, grade_table=self)
             for grade_type in grades_types:
@@ -182,7 +180,6 @@ class Table(models.Model):
 
             data.append({'id': student.id,
                          'fio': student.user.last_name + ' ' + student.user.first_name + ' ' + student.user.middle_name,
-                         # 'grades': student_grades})
                          'grades': student_grades_data})
         return data
 
@@ -211,4 +208,4 @@ class Grade(models.Model):
     class Meta:
         verbose_name = 'Оценка студента'
         verbose_name_plural = 'Оценки студента'
-        ordering = ['grade_type']
+        ordering = ['grade_type', 'id']

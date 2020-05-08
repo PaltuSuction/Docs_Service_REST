@@ -8,7 +8,7 @@ from rest_framework.response import Response
 
 from rest_framework.authtoken.views import ObtainAuthToken
 
-from Docs_Service_REST_v2.ExcelParser import ExcelParser
+from Docs_Service_REST_v2.DocumentHandler import DocumentHandler
 from tablegenapi.serializers import *
 
 
@@ -92,8 +92,8 @@ class ExcelParserView(views.APIView):
     permission_classes = [AllowAny, ]
 
     def post(self, request, format=None):
-        excelparser = ExcelParser()
-        excelparser.parse_excel_file(request.data['faculty_name'])
+        docs_handler = DocumentHandler()
+        docs_handler.parse_excel_file(request.data['faculty_name'])
         return Response({'message': 'success'})
 
 
@@ -238,6 +238,16 @@ class TableCreatorView(views.APIView):
             table = Table.objects.get(id=table_id)
             grades_in_table = Grade.objects.filter(grade_table=table)
             for grade in grades_in_table:
-                grade.grade_value = grades_to_save[str(grade.id)]
+                try:
+                    grade.grade_value = grades_to_save[str(grade.id)]
+                except KeyError:
+                    grade.delete()
                 grade.save()
+            return Response({'result': 'ok'})
+
+        if request.data['action'] == 'create_document':
+            table_id = request.data['params']['table_id']
+            if not table_id: return Response({'result': 'error', 'params': {'message': 'No ID'}})
+            docs_handler = DocumentHandler()
+            docs_handler.generate_excel_document(table_id)
             return Response({'result': 'ok'})
