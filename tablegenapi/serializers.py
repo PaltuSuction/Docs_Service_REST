@@ -70,7 +70,7 @@ class StudyDirectionSerializer(DynamicFieldsModelSerializer):
 
 
 class FacultySerializer(DynamicFieldsModelSerializer):
-    directions_on_faculty = StudyDirectionSerializer(many=True)
+    directions_on_faculty = StudyDirectionSerializer(many=True, required=False)
 
     class Meta:
         model = Faculty
@@ -108,5 +108,5 @@ class TableSerializer(DynamicFieldsModelSerializer):
     class Meta:
         model = Table
         fields = ('id', 'table_name', 'table_group_number', 'table_group', 'table_teacher', 'students_and_grades',
-                  'grades_types')
+                  'grades_types', 'table_created_at', 'table_updated_at')
 

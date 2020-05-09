@@ -3,10 +3,11 @@ import xlrd
 import xlwt
 from xlutils.copy import copy
 
-from docx import Document
-from docx.enum.section import WD_ORIENTATION, WD_SECTION_START
+# from docx import Document
+# from docx.enum.section import WD_ORIENTATION, WD_SECTION_START
 
-
+import pandas as pd
+import pdfkit as pdf
 from tablegenapi.UserModel import User
 from tablegenapi.models import Student, Group, StudyDirection, Faculty, Table
 from rest_framework.authtoken.models import Token
@@ -17,8 +18,7 @@ class DocumentHandler():
     def parse_excel_file(self, filename):
         print('Парсинг начался для файла: {}'.format(filename))
         faculty = Faculty.objects.get(name=filename)
-        path = self.find_path(filename, '.xlsx')
-        # path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..')) + '/files/' + filename + '.xlsx'
+        path = self.find_path('faculties/' + filename, '.xlsx')
         book = xlrd.open_workbook(path)
         sheet = book.sheet_by_index(0)
         prev_stud_dir = ''
@@ -62,7 +62,8 @@ class DocumentHandler():
         print('Парсинг прошел успешно')
 
     def generate_excel_document(self, table_id):
-
+        template_file_name = 'doc_template'
+        new_file_name = 'doc_result'
         table = Table.objects.get(id=table_id)
         doc_table_headers_types = table.grades_types()
         students = table.students_and_grades()
@@ -82,10 +83,13 @@ class DocumentHandler():
             all_students_data.append(student_data)
             student_number += 1
 
-        path = self.find_path('doc_template', '.xls')
+        path = self.find_path('docs_templates/' + template_file_name, '.xls')
         template_book = xlrd.open_workbook(path, on_demand=True, formatting_info=True)
         new_book = copy(template_book)
+        # new_book = xlwt.Workbook()
+        # write_sheet = new_book.add_sheet('Зачет')
         write_sheet = new_book.get_sheet(0)
+        write_sheet.set_portrait(False)
 
         # Заголовок документа
         write_sheet.write(4, 2, 'НЕТ', self.get_style('department_name')) # TODO
@@ -106,13 +110,16 @@ class DocumentHandler():
                 write_sheet.write(i + 11, j, all_students_data[i][j], self.get_style('grades_info'))
 
         # Футер таблицы - информация о преподавателе
-        footer_row = len(all_students_data) + 11 + 4
+        # footer_row = len(all_students_data) + 11 + 4
+        footer_row = 38
         write_sheet.write(footer_row, 1, 'Преподаватель', self.get_style('teacher_title'))
         write_sheet.write(footer_row, 2, '', self.get_style('sign_field'))
         write_sheet.write(footer_row, 3, self.get_teacher_fio(table.table_teacher), self.get_style('teacher_fio'))
-        write_sheet.write(footer_row + 1, 2, '(подпись)', self.get_style('sign_footer'))
-        write_sheet.write(footer_row + 1, 2, '(Фамилия И.О.)', self.get_style('sign_footer'))
-        new_book.save(self.find_path('doc_result', '.xls'))
+        write_sheet.write(footer_row + 1, 2, '(подпись)', self.get_style('sign_footer' ))
+        write_sheet.write(footer_row + 1, 3, '(Фамилия И.О.)', self.get_style('sign_footer'))
+        new_book.save(self.find_path('generated_docs/' + new_file_name, '.xls'))
+
+        return self.find_path('generated_docs/' + new_file_name, '.xls')
 
     def find_path(self, filename, format):
         path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..')) + '/files/' + filename + format
@@ -154,7 +161,7 @@ class DocumentHandler():
             return last_name + ' ' + first_name_short
         else:
             middle_name_short = teacher.user.middle_name[0].upper() + '.'
-            return last_name + ' ' + first_name_short + middle_name_short
+            return last_name + '\n' + first_name_short + middle_name_short
 
     def get_style(self, text_type):
         style = ''
@@ -184,9 +191,16 @@ class DocumentHandler():
                                 "align: horiz centre, vert centre;"
                                 "borders: left thin, top thin, right thin, bottom thin;")
         if text_type == 'teacher_fio':
-            style = xlwt.easyxf("font: color black, name Times New Roman, height 280;"
-                                "align: horiz right, vert centre;"
-                                "border: bottom thin;")
+            style = xlwt.XFStyle()
+            al = xlwt.Alignment()
+            al.wrap = xlwt.Alignment.WRAP_AT_RIGHT
+            al.horz = xlwt.Alignment.HORZ_RIGHT
+            style.font.height = 280
+            style.alignment = al
+            borders = xlwt.Borders()
+            borders.bottom = 1
+            style.borders = borders
+
         if text_type == 'teacher_title':
             style = xlwt.easyxf("font: color black, name Times New Roman, height 240;"
                                 "align: horiz right, vert centre;")
@@ -196,68 +210,3 @@ class DocumentHandler():
             style = xlwt.easyxf("font: color black, name Times New Roman, italic on, height 200;"
                                 "align: horiz centre;")
         return style
-
-    '''def change_doc_orientation(self, document):
-        current_section = document.sections[-1]
-        new_width, new_height = current_section.page_height, current_section.page_width
-        new_section = document.add_section(WD_SECTION_START.NEW_PAGE)
-        new_section.orientation = WD_ORIENTATION.LANDSCAPE
-        new_section.page_width = new_width
-        new_section.page_height = new_height
-
-        return new_section'''
-
-    '''def generate_docx_document(self, table_id):
-            filename_in = 'test_file_1'
-            filename_out = 'generated_file_1'
-            document = Document(self.find_path(filename_in, '.docx'))
-            # self.change_doc_orientation(document)
-
-            current_section = document.sections[-1]
-            print(current_section.orientation, ' ', current_section.page_width, ' ', current_section.page_height)
-            new_width, new_height = current_section.page_height, current_section.page_width
-            new_section = document.add_section(WD_SECTION_START.NEW_PAGE)
-            new_section.orientation = WD_ORIENTATION.LANDSCAPE
-            new_section.page_width = new_width
-            new_section.page_height = new_height
-            print(new_section.orientation, ' ', new_section.page_width, ' ', new_section.page_height)
-            table = Table.objects.get(id=table_id)
-            students = table.students_and_grades()
-            # table_rows_num = table.table_group.student_set.count()
-            table_columns_num = int(table.grade_set.count() / table.table_group.student_set.count()) + 1
-            doc_table = document.add_table(rows=1, cols=table_columns_num)
-            header_cells = doc_table.rows[0].cells
-
-            # TODO Сделать нормально!
-            i = 0
-            for student in students:
-                print(student['grades'])
-                row_cells = doc_table.add_row().cells
-                row_cells[0].text = student['fio']
-            document.save(self.find_path(filename_out, '.docx'))
-            print('Документ создан успешно')'''
-
-
-'''class FitSheetWrapper(object):
-    """Try to fit columns to max size of any entry.
-    To use, wrap this around a worksheet returned from the
-    workbook add_sheet method, like follows:
-
-        sheet = FitSheetWrapper(book.add_sheet(sheet_name))
-
-    The worksheet interface remains the same: this is a drop-in wrapper
-    for auto-sizing columns.
-    """
-    def __init__(self, sheet):
-        self.sheet = sheet
-        self.widths = dict()
-
-    def write(self, r, c, label='', *args, **kwargs):
-        self.sheet.write(r, c, label, *args, **kwargs)
-        width = arial10.fitwidth(label)
-        if width > self.widths.get(c, 0):
-            self.widths[c] = width
-            self.sheet.col(c).width = width
-
-    def __getattr__(self, attr):
-        return getattr(self.sheet, attr)'''

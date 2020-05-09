@@ -37,7 +37,6 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    # 'tablegenapi.apps.TablegenapiConfig',
     'tablegenapi',
     'rest_framework',
     'rest_framework.authtoken',

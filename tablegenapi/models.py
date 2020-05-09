@@ -2,6 +2,7 @@ from django.db import models
 
 # Create your models here.
 from django.db.models import Count
+from django.utils import timezone
 
 from Docs_Service_REST_v2 import settings
 from tablegenapi.UserModel import User
@@ -141,11 +142,13 @@ class Faculty(models.Model):
 
 
 class Table(models.Model):
-    table_name = models.CharField(max_length=300, verbose_name='Название таблицы', help_text='Название таблицы',)
+    table_name = models.CharField(max_length=300, verbose_name='Название таблицы', help_text='Название таблицы', default='Без названия')
     table_group = models.ForeignKey('Group', on_delete=models.CASCADE, verbose_name='Группа для таблицы')
     # table_discipline = models.ForeignKey('Discipline', on_delete=models.CASCADE, verbose_name='Дисциплина для таблицы',
     #                                      null=True)
     table_teacher = models.ForeignKey('Teacher', on_delete=models.CASCADE, verbose_name='Создатель таблицы')
+    table_created_at = models.DateTimeField(editable=False)
+    table_updated_at = models.DateTimeField()
 
     class Meta:
         verbose_name = 'Таблица для группы'
@@ -155,12 +158,10 @@ class Table(models.Model):
         return 'Таблица группы {}, {}'.format(self.table_group.number, self.table_name)
 
     def save(self, *args, **kwargs):
-        if not self.table_name:
-            self.table_name = '{}, {} {} {}'.format(self.table_group.number,
-                                     self.table_teacher.user.last_name,
-                                     self.table_teacher.user.first_name,
-                                     self.table_teacher.user.middle_name)
-        super(Table, self).save(*args, **kwargs)
+        if not self.id:
+            self.table_created_at = timezone.now()
+        self.table_updated_at = timezone.now()
+        return super(Table, self).save(*args, **kwargs)
 
     def table_group_number(self):
         return self.table_group.number

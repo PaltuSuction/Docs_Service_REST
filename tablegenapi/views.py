@@ -11,6 +11,9 @@ from rest_framework.authtoken.views import ObtainAuthToken
 from Docs_Service_REST_v2.DocumentHandler import DocumentHandler
 from tablegenapi.serializers import *
 
+from rest_framework import generics
+from django.http import HttpResponse
+from wsgiref.util import FileWrapper
 
 class StudentViewSet(viewsets.ModelViewSet):
     queryset = Student.objects.all()
@@ -192,8 +195,9 @@ class TableCreatorView(views.APIView):
         if request.data['action'] == 'get_all':
             table_author = Teacher.objects.get(user=user)
             all_author_tables = Table.objects.filter(table_teacher=table_author)
-            serializer = TableSerializer(all_author_tables, many=True, fields=['id', 'table_name', 'table_group_number'])
-            return Response({'result': 'ok', 'params': {'all_author_tables': serializer.data} })
+            serializer = TableSerializer(all_author_tables, many=True, fields=['id', 'table_name', 'table_group_number',
+                                                                               'table_created_at', 'table_updated_at'])
+            return Response({'result': 'ok', 'params': {'all_author_tables': serializer.data}})
 
         if request.data['action'] == 'delete_table':
             table_id = request.data['params']['table_id']
@@ -249,5 +253,8 @@ class TableCreatorView(views.APIView):
             table_id = request.data['params']['table_id']
             if not table_id: return Response({'result': 'error', 'params': {'message': 'No ID'}})
             docs_handler = DocumentHandler()
-            docs_handler.generate_excel_document(table_id)
-            return Response({'result': 'ok'})
+            path_to_document = docs_handler.generate_excel_document(table_id)
+            document = open(path_to_document, 'rb')
+            response = HttpResponse(FileWrapper(document), content_type='application/vnd.ms-excel')
+            response['Content-Disposition'] = 'attachment; filename="doc_result.xls"'
+            return response
