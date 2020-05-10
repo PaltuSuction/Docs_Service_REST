@@ -71,12 +71,15 @@ class DocumentHandler():
         student_number = 1
         all_students_data = []
         for student in students:
+            '''
             student_fio_words = student['fio'].split()
             try:
                 student_middle_name = student_fio_words[2]
             except:
                 student_middle_name = ''
             student_data = [student_number, student_fio_words[0], student_fio_words[1], student_middle_name]
+            '''
+            student_data = [student_number, student['fio']]
             for grade_type in student['grades']:
                 for grade in student['grades'][grade_type]:
                     student_data.append(grade['grade_value'])
@@ -86,8 +89,6 @@ class DocumentHandler():
         path = self.find_path('docs_templates/' + template_file_name, '.xls')
         template_book = xlrd.open_workbook(path, on_demand=True, formatting_info=True)
         new_book = copy(template_book)
-        # new_book = xlwt.Workbook()
-        # write_sheet = new_book.add_sheet('Зачет')
         write_sheet = new_book.get_sheet(0)
         write_sheet.set_portrait(False)
 
@@ -104,14 +105,17 @@ class DocumentHandler():
 
         # Тело таблицы - данные студентов
         for i in range(len(all_students_data)):
-            for j in range(0, 4):
+            write_sheet.merge(i + 11, i + 11, 1, 3, self.get_style('student_info'))
+            # write_sheet.write(i + 11, 0, all_students_data[i][0])
+            # write_sheet.write(i + 11, 1, all_students_data[i][1])
+            for j in range(0, 2):
                 write_sheet.write(i + 11, j, all_students_data[i][j], self.get_style('student_info'))
-            for j in range(4, len(all_students_data[i])):
-                write_sheet.write(i + 11, j, all_students_data[i][j], self.get_style('grades_info'))
+            for j in range(2, len(all_students_data[i])):
+                write_sheet.write(i + 11, j + 2, all_students_data[i][j], self.get_style('grades_info'))
 
         # Футер таблицы - информация о преподавателе
-        # footer_row = len(all_students_data) + 11 + 4
-        footer_row = 38
+        footer_row = len(all_students_data) + 11 + 2
+        # footer_row = 38
         write_sheet.write(footer_row, 1, 'Преподаватель', self.get_style('teacher_title'))
         write_sheet.write(footer_row, 2, '', self.get_style('sign_field'))
         write_sheet.write(footer_row, 3, self.get_teacher_fio(table.table_teacher), self.get_style('teacher_fio'))

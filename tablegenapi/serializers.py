@@ -86,7 +86,6 @@ class UserSerializer(serializers.ModelSerializer):
 
 class GradeSerializer(DynamicFieldsModelSerializer):
     grade_student = StudentSerializer()
-    # grade_table = TableSerializer()
 
     class Meta:
         model = Grade

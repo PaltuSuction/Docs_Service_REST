@@ -106,8 +106,6 @@ class FacultsAndDirectsView(views.APIView):
     def get(self, request, format=None):
         faculties = Faculty.objects.all()
         serializer = FacultySerializer(faculties, many=True, fields=['name', 'directions_names_on_faculty'])
-        data = serializer.data
-        # return Response(data, status=status.HTTP_200_OK)
         return Response({'result': 'ok', 'params': {'data': serializer.data}}, status=status.HTTP_200_OK)
 
 
@@ -187,7 +185,7 @@ class TableCreatorView(views.APIView):
             new_table.save()
             students_in_table = table_group.students_in_group()
             for student in students_in_table:
-                final_grade = Grade.objects.create(grade_student=student, grade_table=new_table, grade_type='Итог',
+                final_grade = Grade.objects.create(grade_student=student, grade_table=new_table, grade_type='\u05C4Итог',
                                                    grade_value=None)
             table_data = TableSerializer(new_table, fields=['id', 'students_and_grades', 'grades_types']).data
             return Response({'result': 'ok', 'params': {'table_data': table_data}})

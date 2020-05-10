@@ -192,6 +192,7 @@ class Table(models.Model):
             type['grade_type__count'] = type['grade_type__count'] / students_num_in_group
 
         grades_types_dict = {type['grade_type'] : int(type['grade_type__count']) for type in grades_types}
+        grades_types_dict = dict(sorted(grades_types_dict.items()))
         return grades_types_dict
 
 
@@ -204,9 +205,21 @@ class Grade(models.Model):
     grade_table = models.ForeignKey('Table', on_delete=models.CASCADE, verbose_name='Таблица для оценки')
     grade_type = models.CharField(max_length=100, verbose_name='Тип оценки', help_text='Укажите тип оценки',
                                   default='test')
+     # grade_type_order = models.IntegerField(verbose_name='Число для определения порядка сортировки', null=True)
     grade_value = models.CharField(max_length=20, verbose_name='Значение оценки', help_text='Укажите значение оценки', null=True)
 
     class Meta:
         verbose_name = 'Оценка студента'
         verbose_name_plural = 'Оценки студента'
         ordering = ['grade_type', 'id']
+
+    '''def save(self, *args, **kwargs):
+        if not self.id:
+            order_id = 0
+            if self.grade_type == 'Итог':
+                self.grade_type_order = 999999999
+            else:
+                for chr in self.grade_type:
+                    order_id += ord(chr)
+                self.grade_type_order = order_id
+        return super(Grade, self).save(*args, **kwargs)'''
