@@ -107,5 +107,5 @@ class TableSerializer(DynamicFieldsModelSerializer):
     class Meta:
         model = Table
         fields = ('id', 'table_name', 'table_group_number', 'table_group', 'table_teacher', 'students_and_grades',
-                  'grades_types', 'table_created_at', 'table_updated_at')
+                  'grades_types', 'table_created_at', 'table_updated_at', 'table_direction')
 

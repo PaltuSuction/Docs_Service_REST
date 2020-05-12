@@ -1,3 +1,5 @@
+import os
+
 from rest_framework import viewsets, status, views
 # Create your views here.
 from rest_framework.authentication import TokenAuthentication
@@ -14,6 +16,7 @@ from tablegenapi.serializers import *
 from rest_framework import generics
 from django.http import HttpResponse
 from wsgiref.util import FileWrapper
+
 
 class StudentViewSet(viewsets.ModelViewSet):
     queryset = Student.objects.all()
@@ -59,7 +62,13 @@ class FacultyViewSet(viewsets.ModelViewSet):
             return Response({'result': 'error', 'params': {'message': 'Faculty list creation error'}})
 
     def perform_create(self, serializer):
+        docs_handler = DocumentHandler()
         file_obj = serializer.validated_data['excel_file']
+        file_obj.name = serializer.validated_data['name'] + '.xlsx'
+        try:
+            os.remove(docs_handler.find_path('faculties/' + file_obj.name, ''))
+        except:
+            pass
         faculty, created = Faculty.objects.update_or_create(
             name=serializer.validated_data.get('name', None),
             defaults={'excel_file': file_obj}
@@ -171,10 +180,16 @@ class TableCreatorView(views.APIView):
     def post(self, request, format=None):
         user = request.user
         if request.data['action'] == 'get_directions':
-            teacher = Teacher.objects.get(user=user)
-            teacher_directs = StudyDirection.objects.filter(teacher=teacher)
+            try:
+                teacher = Teacher.objects.get(user=user)
+            except:
+                Response({'result': 'error', 'params': {'message': 'Ошибка авторизации'}})
+            try:
+                teacher_directs = StudyDirection.objects.filter(teacher=teacher)
+            except: Response({'result': 'error', 'params': {'message': 'Не указаны направления подготовки'}})
             serializer = StudyDirectionSerializer(teacher_directs, many=True, fields=['name'])
-            return Response({'result': 'ok', 'params': {'directions_names': serializer.data}})
+            all_group_numbers = [group.number for group in Group.objects.all()]
+            return Response({'result': 'ok', 'params': {'directions_names': serializer.data, 'all_group_numbers': all_group_numbers}})
 
         if request.data['action'] == 'create_new':
             table_group_number = request.data['params']['group_number']
@@ -193,8 +208,9 @@ class TableCreatorView(views.APIView):
         if request.data['action'] == 'get_all':
             table_author = Teacher.objects.get(user=user)
             all_author_tables = Table.objects.filter(table_teacher=table_author)
-            serializer = TableSerializer(all_author_tables, many=True, fields=['id', 'table_name', 'table_group_number',
-                                                                               'table_created_at', 'table_updated_at'])
+            serializer = TableSerializer(all_author_tables, many=True, fields=['id', 'table_name', 'table_direction',
+                                                                               'table_group_number', 'table_created_at',
+                                                                               'table_updated_at'])
             return Response({'result': 'ok', 'params': {'all_author_tables': serializer.data}})
 
         if request.data['action'] == 'delete_table':
@@ -219,6 +235,7 @@ class TableCreatorView(views.APIView):
                 new_grade = Grade.objects.create(grade_student=student, grade_table=table, grade_type=new_column_type,
                                                  grade_value=None)
                 new_grades[student.id] = {'id': new_grade.id, 'grade_value': new_grade.grade_value}
+            table.save()  # Обновить дату обновления таблицы
             return Response({'result': 'ok', 'params': {'new_grades': new_grades}})
 
         if request.data['action'] == 'delete_column':
@@ -231,6 +248,7 @@ class TableCreatorView(views.APIView):
             grades_to_delete = grades_in_table.filter(id__in=grades_ids)
             for grade in grades_to_delete:
                 grade.delete()
+            table.save()  # Обновить дату обновления таблицы
             return Response({'result': 'ok'})
 
         if request.data['action'] == 'save_table':
@@ -245,14 +263,15 @@ class TableCreatorView(views.APIView):
                 except KeyError:
                     grade.delete()
                 grade.save()
+            table.save()  # Обновить дату обновления таблицы
             return Response({'result': 'ok'})
 
         if request.data['action'] == 'create_document':
             table_id = request.data['params']['table_id']
             if not table_id: return Response({'result': 'error', 'params': {'message': 'No ID'}})
             docs_handler = DocumentHandler()
-            path_to_document = docs_handler.generate_excel_document(table_id)
-            document = open(path_to_document, 'rb')
+            new_document_name = docs_handler.generate_excel_document(table_id)
+            document = open(docs_handler.find_path('generated_docs/' + new_document_name, '.xls'), 'rb')
             response = HttpResponse(FileWrapper(document), content_type='application/vnd.ms-excel')
-            response['Content-Disposition'] = 'attachment; filename="doc_result.xls"'
+            response['Content-Disposition'] = 'attachment; filename="{}.xls"'.format(new_document_name)
             return response

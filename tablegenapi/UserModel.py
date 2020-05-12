@@ -68,7 +68,7 @@ class User(AbstractBaseUser, PermissionsMixin):
         '''
         Returns the first_name plus the last_name, with a space in between.
         '''
-        full_name = '{} {} {}'.format(self.lastName, self.firstName, self.middleName)
+        full_name = '{} {} {}'.format(self.last_name, self.first_name, self.middle_name)
         return full_name.strip()
 
     def get_username(self):

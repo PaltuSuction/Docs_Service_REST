@@ -10,7 +10,7 @@ from tablegenapi.UserModel import User
 
 class Student(models.Model):
     user = models.OneToOneField(User, on_delete=models.SET_NULL, null=True, blank=True)
-    student_group = models.ForeignKey('Group', on_delete=models.CASCADE, verbose_name='Группа')
+    student_group = models.ForeignKey('Group', on_delete=models.SET_NULL, verbose_name='Группа', null=True)
     ticket_number = models.CharField(max_length=20)
 
     class Meta:
@@ -64,6 +64,7 @@ class Group(models.Model):
     headman = models.OneToOneField('Student', verbose_name='Староста', help_text='Староста группы',
                                    null=True, blank=True, on_delete=models.SET_NULL)
     studying_direction = models.ForeignKey('StudyDirection', null=True, blank=True, on_delete=models.SET_NULL)
+    studying_start_year = models.CharField(max_length=4, verbose_name='Год начала обучения', null=True)
 
     class Meta:
         verbose_name = 'Группа'
@@ -77,9 +78,15 @@ class Group(models.Model):
         students = Student.objects.filter(student_group=self)
         return students
 
+    def group_all_students_ids(self):
+        group_students_ids = []
+        students = Student.objects.filter(student_group=self)
+        for student in students:
+            group_students_ids.append(student.id)
+        return group_students_ids
+
 
 class StudyDirection(models.Model):
-
     name = models.CharField(max_length=300, verbose_name='Название направления', help_text='Название направления',
                             unique=True)
     faculty = models.ForeignKey('Faculty', null=True, blank=True, on_delete=models.SET_NULL)
@@ -96,8 +103,7 @@ class StudyDirection(models.Model):
         groups = Group.objects.filter(studying_direction=self)
         groups_list = []
         for group in groups:
-            groups_list.append({'number': group.number,
-                                'headman': group.headman})
+            groups_list.append(group.number)
         return groups_list
 
     def teachers_names_on_direction(self):
@@ -120,7 +126,7 @@ class StudyDirection(models.Model):
 
 class Faculty(models.Model):
     name = models.CharField(max_length=300, verbose_name='Факультет', help_text='Факультет')
-    excel_file = models.FileField(upload_to='files', blank=True, null=True, verbose_name='Файл - список студентов')
+    excel_file = models.FileField(upload_to='files/faculties', blank=True, null=True, verbose_name='Файл - список студентов')
 
     class Meta:
         verbose_name = 'Факультет'
@@ -165,6 +171,9 @@ class Table(models.Model):
 
     def table_group_number(self):
         return self.table_group.number
+
+    def table_direction(self):
+        return self.table_group.studying_direction.name
 
     def students_and_grades(self):
         data = []
