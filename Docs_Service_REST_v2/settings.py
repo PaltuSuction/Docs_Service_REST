@@ -40,11 +40,11 @@ INSTALLED_APPS = [
     'tablegenapi',
     'rest_framework',
     'rest_framework.authtoken',
-    'corsheaders',
+    # 'corsheaders',
 
-    'rest_auth',
-    'allauth',
-    'django.contrib.sites',
+    # 'rest_auth',
+    # 'allauth',
+    # 'django.contrib.sites',
 ]
 SITE_ID = 1
 

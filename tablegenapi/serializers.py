@@ -1,10 +1,14 @@
-from rest_auth.registration.views import RegisterView
+# from rest_auth.registration.views import RegisterView
 from rest_framework import serializers
 from rest_framework.authtoken.models import Token
 
 from Docs_Service_REST_v2 import settings
 from tablegenapi.UserModel import User
 from tablegenapi.models import Student, Teacher, Group, StudyDirection, Faculty, Table, Grade
+
+from django.contrib.auth.password_validation import validate_password
+from django.contrib.auth import authenticate
+from django.utils.translation import ugettext_lazy as _
 
 
 class DynamicFieldsModelSerializer(serializers.ModelSerializer):
@@ -44,11 +48,10 @@ class StudentSerializer(serializers.ModelSerializer):
 
 
 class TeacherSerializer(DynamicFieldsModelSerializer):
-    # studying_directions = StudyDirectionSerializer(many=True)
 
     class Meta:
         model = Teacher
-        fields = ('id', 'first_name', 'middle_name', 'last_name', 'directions_names')
+        fields = ('id', 'first_name', 'middle_name', 'last_name', 'directions_names', 'departments')
 
 
 class GroupSerializer(DynamicFieldsModelSerializer):
@@ -80,7 +83,8 @@ class FacultySerializer(DynamicFieldsModelSerializer):
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ('id', 'username', 'first_name', 'middle_name', 'last_name', 'is_teacher', 'is_student', 'password')
+        fields = ('id', 'email', 'first_name', 'middle_name', 'last_name', 'is_teacher', 'is_student', 'password')
+        # fields = ('id', 'email', 'is_teacher', 'is_student', 'password')
         extra_kwargs = {'password': {'required': True, 'write_only': True}}
 
 
@@ -101,11 +105,40 @@ class CustomTableGradesSerializer(serializers.Serializer):
 class TableSerializer(DynamicFieldsModelSerializer):
     table_group = GroupSerializer()
     table_teacher = TeacherSerializer(fields=['first_name', 'middle_name', 'last_name'])
-    # table_teacher = TeacherSerializer(fields=['first_name', 'middle_name', 'last_name'])
-    # students_and_grades = CustomTableGradesSerializer(many=True)
 
     class Meta:
         model = Table
         fields = ('id', 'table_name', 'table_group_number', 'table_group', 'table_teacher', 'students_and_grades',
-                  'grades_types', 'table_created_at', 'table_updated_at', 'table_direction')
+                  'grades_types', 'table_created_at', 'table_updated_at', 'table_direction', 'table_department')
+
+
+class ChangePasswordSerializer(serializers.Serializer):
+    old_password = serializers.CharField(required=True)
+    new_password = serializers.CharField(required=True)
+    new_password_2 = serializers.CharField(required=True)
+
+    def validate_new_password(self, value):
+        validate_password(value)
+        return value
+
+
+class AuthCustomTokenSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    password = serializers.CharField()
+
+    def validate(self, attrs):
+        email = attrs.get('email')
+        password = attrs.get('password')
+
+        if email and password:
+            user = authenticate(email=email, password=password)
+            if not user:
+                msg = _('Нет пользователя с указанными данными')
+                print(msg)
+        else:
+            msg = _('Не все данные указаны')
+            print(msg)
+
+        attrs['user'] = user
+        return attrs
 

@@ -7,39 +7,37 @@ from django.utils.translation import ugettext_lazy as _
 class UserManager(BaseUserManager):
     use_in_migrations = True
 
-    def _create_user(self, username, password, **extra_fields):
+    def _create_user(self, email, password, **extra_fields):
         """
-        Creates and saves a User with the given username and password.
+        Создает и сохраняет пользователя с введенным им email и паролем.
         """
-        if not username:
-            raise ValueError('The username must be set')
-        user = self.model(username=username, **extra_fields)
+        if not email:
+            raise ValueError('email должен быть указан')
+        email = self.normalize_email(email)
+        user = self.model(email=email, **extra_fields)
         user.set_password(password)
         user.save(using=self._db)
         return user
 
-    def create_user(self, username, password=None, **extra_fields):
+    def create_user(self, email, password=None, **extra_fields):
         extra_fields.setdefault('is_superuser', False)
-        extra_fields.setdefault('is_staff', False)
+        return self._create_user(email, password, **extra_fields)
 
-        return self._create_user(username, password, **extra_fields)
-
-    def create_superuser(self, username, password, **extra_fields):
+    def create_superuser(self, email, password, **extra_fields):
         extra_fields.setdefault('is_superuser', True)
-        extra_fields.setdefault('is_staff', True)
 
         if extra_fields.get('is_superuser') is not True:
             raise ValueError('Superuser must have is_superuser=True.')
 
-        return self._create_user(username, password, **extra_fields)
+        return self._create_user(email, password, **extra_fields)
 
 
 class User(AbstractBaseUser, PermissionsMixin):
-    username = models.CharField(max_length=200, unique=True)
-
-    first_name = models.CharField(_('first_name'), max_length=30, blank=True)
-    last_name = models.CharField(_('last_name'), max_length=30, blank=True)
-    middle_name = models.CharField(_('middle_name'), max_length=30, blank=True )
+    email = models.EmailField(_('email'), unique=True)
+    # user_ident = models.CharField(max_length=200, unique=True) # student -> ticket_number, teacher -> email
+    # first_name = models.CharField(_('first_name'), max_length=30, blank=True)
+    # last_name = models.CharField(_('last_name'), max_length=30, blank=True)
+    # middle_name = models.CharField(_('middle_name'), max_length=30, blank=True)
 
     is_staff = models.BooleanField(_('staff'), default=False)
     is_teacher = models.BooleanField(_('teacher'), default=False)
@@ -47,7 +45,7 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     objects = UserManager()
 
-    USERNAME_FIELD = 'username'
+    USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = []
 
     class Meta:
@@ -64,13 +62,23 @@ class User(AbstractBaseUser, PermissionsMixin):
         else:
             return None
 
-    def get_full_name(self):
-        '''
-        Returns the first_name plus the last_name, with a space in between.
-        '''
-        full_name = '{} {} {}'.format(self.last_name, self.first_name, self.middle_name)
-        return full_name.strip()
-
     def get_username(self):
-        return self.username
+        return self.email
 
+    def first_name(self):
+        if self.is_teacher:
+            return self.teacher.first_name
+        if self.is_student:
+            return self.student.first_name
+
+    def middle_name(self):
+        if self.is_teacher:
+            return self.teacher.middle_name
+        if self.is_student:
+            return self.student.middle_name
+
+    def last_name(self):
+        if self.is_teacher:
+            return self.teacher.last_name
+        if self.is_student:
+            return self.student.last_name

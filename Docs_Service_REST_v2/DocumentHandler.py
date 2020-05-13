@@ -41,7 +41,8 @@ class DocumentHandler():
                 prev_direction = stud_dir
                 if not dir_created_now:
                     if not groups_and_dirs.get(stud_dir):
-                        groups_and_dirs[stud_dir] = [group.number for group in Group.objects.filter(studying_direction=study_direction)]
+                        groups_and_dirs[stud_dir] = [group.number for group in
+                                                     Group.objects.filter(studying_direction=study_direction)]
 
             if grp != prev_group:
                 already_parsed_groups.append(grp)
@@ -49,34 +50,38 @@ class DocumentHandler():
                                                                      studying_direction=study_direction,
                                                                      studying_start_year=str(xlrd.xldate_as_tuple(row[8], 0)[0]))
                 if not grp_created_now:
-                    groups_and_dirs[stud_dir].remove(group.number) # Удаляем группу из списка кандидатов на удаление
-                    students_in_group[group.number] = group.group_all_students_ids() # Все студенты в текущей группе - кандидаты на удаление
+                    groups_and_dirs[stud_dir].remove(group.number)  # Удаляем группу из списка кандидатов на удаление
+                    students_in_group[group.number] = group.group_all_students_ids()  # Все студенты в текущей группе - кандидаты на удаление
                 prev_group = grp
 
             try:
                 student_middle_name = row[1].split(' ')[2]
             except:
                 student_middle_name = ''
-            new_student_user, user_created_now = User.objects.get_or_create(username=row[0],
-                                                                            last_name=row[1].split(' ')[0],
-                                                                            first_name=row[1].split(' ')[1],
-                                                                            middle_name=student_middle_name,
-                                                                            is_student=True,
-                                                                            )
-            if user_created_now:
-                new_student_user.set_password('testpassword1')
-                new_student_user.save()
-                Token.objects.create(user=new_student_user)
-                new_student = Student.objects.create(user=new_student_user,
-                                                     student_group=group,
-                                                     ticket_number=row[0],
-                                                     )
+            '''new_student_user, user_created_now = User.objects.get_or_create(email=row[0],
+                                                                        last_name=row[1].split(' ')[0],
+                                                                        first_name=row[1].split(' ')[1],
+                                                                        middle_name=student_middle_name,
+                                                                        is_student=True,
+                                                                        )'''
+
+            # if user_created_now:
+            # new_student_user.set_password('testpassword1')
+            # new_student_user.save()
+            #
+            new_student, student_created_now = Student.objects.get_or_create(last_name=row[1].split(' ')[0],
+                                                                             first_name=row[1].split(' ')[1],
+                                                                             middle_name=student_middle_name,
+                                                                             student_group=group,
+                                                                             ticket_number=row[0],
+                                                                             )
+            if student_created_now:
                 print('Добавлены данные студента (группа: {})'.format(grp))
             else:
-                students_in_group[group.number].remove(new_student_user.student.id)
+                students_in_group[group.number].remove(new_student.id)
                 print('Данные студента не изменены: (группа: {})'.format(grp))
 
-        for direct_name in groups_and_dirs:     # Удаляем все группы, которые были в БД, но отсутствуют в новом списке
+        for direct_name in groups_and_dirs:  # Удаляем все группы, которые были в БД, но отсутствуют в новом списке
             for group_number in groups_and_dirs[direct_name]:
                 if group_number not in already_parsed_groups:
                     group_to_delete = Group.objects.get(number=group_number)
@@ -86,13 +91,16 @@ class DocumentHandler():
         for group_number in students_in_group:  # Удаляем всех студентов, которые были в БД, но отсутствуют в новом списке
             for student_id in students_in_group[group_number]:
                 student_to_delete = Student.objects.get(id=student_id)
-                user_to_delete = User.objects.get(student=student_to_delete)
+                try: # Если у этого студента был аккаунт - удаляем
+                    user_to_delete = User.objects.get(student=student_to_delete)
+                    user_to_delete.delete()
+                except: pass
+                print('Студент удален: № {}'.format(student_to_delete.ticket_number))
                 student_to_delete.delete()
-                user_to_delete.delete()
 
         print('Парсинг прошел успешно')
-        # print(groups_and_dirs)
-        # print(students_in_group)
+        print(groups_and_dirs)
+        print(students_in_group)
 
     def generate_excel_document(self, table_id):
         template_file_name = 'doc_template'
@@ -119,11 +127,11 @@ class DocumentHandler():
         write_sheet.set_portrait(False)
 
         # Заголовок документа
-        write_sheet.write(4, 2, 'НЕТ', self.get_style('department_name')) # TODO
+        write_sheet.write(4, 2, table.table_department, self.get_style('department_name'))
         write_sheet.write(5, 2, table.table_name, self.get_style('discipline_name'))
         write_sheet.write(6, 2, table.table_group.number, self.get_style('group_number'))
-        write_sheet.write(7, 1, self.group_semester(table.table_group), self.get_style('sem_number')) # TODO
-
+        write_sheet.write(7, 1, self.group_semester_and_year(table.table_group)[0], self.get_style('sem_number'))
+        write_sheet.write(8, 1, self.group_semester_and_year(table.table_group)[1], self.get_style('teacher_fio'))
         # Заголовки таблицы
         for i in range(len(doc_table_headers)):
             # short_header = self.get_short_header(doc_table_headers[i])
@@ -143,7 +151,7 @@ class DocumentHandler():
         write_sheet.write(footer_row, 1, 'Преподаватель', self.get_style('teacher_title'))
         write_sheet.write(footer_row, 2, '', self.get_style('sign_field'))
         write_sheet.write(footer_row, 3, self.get_teacher_fio(table.table_teacher), self.get_style('teacher_fio'))
-        write_sheet.write(footer_row + 1, 2, '(подпись)', self.get_style('sign_footer' ))
+        write_sheet.write(footer_row + 1, 2, '(подпись)', self.get_style('sign_footer'))
         write_sheet.write(footer_row + 1, 3, '(Фамилия И.О.)', self.get_style('sign_footer'))
         new_book.save(self.find_path('generated_docs/' + new_file_name, '.xls'))
 
@@ -162,8 +170,8 @@ class DocumentHandler():
                 short_type = ''
                 words_in_type = type.split()
 
-                if len(words_in_type) == 1:     # Если заголовок однословный - оставляем аббревиатуры,
-                    if type.upper() == type:    # иначе сокращаем до 3 букв при длинне больше 6
+                if len(words_in_type) == 1:  # Если заголовок однословный - оставляем аббревиатуры,
+                    if type.upper() == type:  # иначе сокращаем до 3 букв при длинне больше 6
                         for n in range(all_header_types[type]):
                             doc_table_headers.append('{} {}'.format(type, n + 1))
                     else:
@@ -183,68 +191,95 @@ class DocumentHandler():
         return doc_table_headers
 
     def get_teacher_fio(self, teacher):
-        last_name = teacher.user.last_name
-        first_name_short = teacher.user.first_name[0].upper() + '.'
-        if teacher.user.middle_name == '':
+        last_name = teacher.last_name
+        first_name_short = teacher.first_name[0].upper() + '.'
+        if teacher.middle_name == '':
             return last_name + ' ' + first_name_short
         else:
-            middle_name_short = teacher.user.middle_name[0].upper() + '.'
+            middle_name_short = teacher.middle_name[0].upper() + '.'
             return last_name + '\n' + first_name_short + middle_name_short
 
-    def group_semester(self, group):
+    def group_semester_and_year(self, group):
         now = datetime.datetime.now()
+        current_study_year = ''
         study_year = int(now.year) - int(group.studying_start_year)
-        if now.month >= 9 and now.month < 12: # Семестр нечётный
+        if now.month >= 9 and now.month < 12:  # Семестр нечётный
             sem_number = study_year * 2 - 1
-        else: # Семестр чётный
+            current_study_year = str(now.year) + '/' + str(int(now.year) + 1)
+        else:  # Семестр чётный
             sem_number = study_year * 2
-        return sem_number
+            current_study_year = str(int(now.year) - 1) + '/' + str(now.year)
+        return (sem_number, current_study_year)
 
 
     def get_style(self, text_type):
-        style = ''
-
+        style = xlwt.XFStyle()
+        al = xlwt.Alignment()
+        al.vert = xlwt.Alignment.VERT_CENTER
         if text_type == 'discipline_name':
-            style = xlwt.easyxf("font: color black, name Times New Roman, bold on, height 280;"
-                                "align: horiz left, vert centre;")
+            al.horz = xlwt.Alignment.HORZ_LEFT
+            style.font.height = 280
+            style.font.bold = True
         if text_type == 'group_number':
-            style = xlwt.easyxf("font: color black, name Times New Roman, bold on, height 280;"
-                                "align: horiz centre, vert centre;")
+            al.horz = xlwt.Alignment.HORZ_CENTER
+            style.font.height = 280
+            style.font.bold = True
         if text_type == 'department_name':
-            style = xlwt.easyxf("font: color black, name Times New Roman, italic on, height 240;"
-                                "align: horiz left, vert centre")
+            al.horz = xlwt.Alignment.HORZ_LEFT
+            style.font.height = 240
+            style.font.italic = True
         if text_type == 'sem_number':
-            style = xlwt.easyxf("font: color black, name Times New Roman, bold on, height 240;"
-                                "align: horiz right, vert centre")
+            al.horz = xlwt.Alignment.HORZ_RIGHT
+            style.font.height = 240
+            style.font.bold = True
+            style.font.name = 'Times New Roman'
         if text_type == 'student_info':
-            style = xlwt.easyxf("font: color black, name Arial, height 180;"
-                                "align: horiz left, vert centre;"
-                                "borders: left thin, top thin, right thin, bottom thin;")
+            al.horz = xlwt.Alignment.HORZ_LEFT
+            style.font.height = 180
+            borders = xlwt.Borders()
+            borders.bottom = 1
+            borders.left = 1
+            borders.right = 1
+            borders.top = 1
+            style.borders = borders
         if text_type == 'grades_info':
-            style = xlwt.easyxf("font: color black, name Arial, height 180;"
-                                "align: horiz centre, vert centre;"
-                                "borders: left thin, top thin, right thin, bottom thin;")
+            al.horz = xlwt.Alignment.HORZ_CENTER
+            style.font.height = 180
+            borders = xlwt.Borders()
+            borders.bottom = 1
+            borders.left = 1
+            borders.right = 1
+            borders.top = 1
+            style.borders = borders
         if text_type == 'table_header':
-            style = xlwt.easyxf("font: color black, name Times New Roman, height 200;"
-                                "align: horiz centre, vert centre;"
-                                "borders: left thin, top thin, right thin, bottom thin;")
+            al.horz = xlwt.Alignment.HORZ_CENTER
+            style.font.height = 200
+            borders = xlwt.Borders()
+            borders.bottom = 1
+            borders.left = 1
+            borders.right = 1
+            borders.top = 1
+            style.borders = borders
         if text_type == 'teacher_fio':
-            style = xlwt.XFStyle()
-            al = xlwt.Alignment()
             al.wrap = xlwt.Alignment.WRAP_AT_RIGHT
             al.horz = xlwt.Alignment.HORZ_RIGHT
+            al.vert = xlwt.Alignment.VERT_BOTTOM
             style.font.height = 280
-            style.alignment = al
             borders = xlwt.Borders()
             borders.bottom = 1
             style.borders = borders
-
         if text_type == 'teacher_title':
-            style = xlwt.easyxf("font: color black, name Times New Roman, height 240;"
-                                "align: horiz right, vert centre;")
+            al.horz = xlwt.Alignment.HORZ_RIGHT
+            style.font.height = 240
+            style.font.name = 'Times New Roman'
         if text_type == 'sign_field':
-            style = xlwt.easyxf("border: bottom thin")
+            borders = xlwt.Borders()
+            borders.bottom = 1
+            style.borders = borders
         if text_type == 'sign_footer':
-            style = xlwt.easyxf("font: color black, name Times New Roman, italic on, height 200;"
-                                "align: horiz centre;")
+            al.horz = xlwt.Alignment.HORZ_CENTER
+            style.font.italic = True
+            style.font.height = 200
+            style.font.name = 'Times New Roman'
+        style.alignment = al
         return style

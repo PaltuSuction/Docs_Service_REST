@@ -87,15 +87,15 @@ class CustomObtainAuthToken(ObtainAuthToken):
     permission_classes = (AllowAny,)
 
     def post(self, request, *args, **kwargs):
-        serializer = self.serializer_class(data=request.data,
-                                           context={'request': request})
+        serializer = AuthCustomTokenSerializer(data=request.data,
+                                               context={'request': request})
         try:
             serializer.is_valid(raise_exception=True)
-        except:
+        except Exception as e:
+            print(e)
             return Response({'result': 'error', 'params': {'message': 'Incorrect data'}})
         user = serializer.validated_data['user']
         token, created = Token.objects.get_or_create(user=user)
-        # user_data = get_user_data(user=user)
         user_serializer = UserSerializer(user)
         return Response({'result': 'ok', 'params': {'token': token.key, 'user': user_serializer.data}})
 
@@ -122,39 +122,123 @@ class CustomRegisterView(views.APIView):
     permission_classes = [AllowAny]
 
     def post(self, request, format=None):
-            user = User.objects.create(username=request.data['username'],
-                                       first_name=request.data['first_name'],
-                                       last_name=request.data['last_name'],
-                                       middle_name=request.data['middle_name'],
-                                       is_student=request.data['is_student'],
-                                       is_teacher=request.data['is_teacher'],
-                                       is_staff=request.data['is_staff'])
-            user.set_password(request.data['password'])
-            user.save()
+        user = User.objects.create(email=request.data['email'],
+                                   # first_name=request.data['first_name'],
+                                   # last_name=request.data['last_name'],
+                                   # middle_name=request.data['middle_name'],
+                                   is_student=request.data['is_student'],
+                                   is_teacher=request.data['is_teacher'],
+                                   is_staff=request.data['is_staff'])
+        user.set_password(request.data['password'])
 
-            if request.data['is_teacher']:
-                studying_directions_names = request.data['studying_directions']
-                studying_directions = StudyDirection.objects.filter(name__in=studying_directions_names)
-                teacher = Teacher.objects.create(user=user)
-                teacher.save()
-                for direction in studying_directions:
-                    teacher.studying_directions.add(direction)
-            elif request.data['is_student']:
-                group = Group.objects.get(number=request.data['group_number'])
-                student = Student.objects.create(ticket_number=request.data['username'], student_group=group)
-            # user_data = get_user_data(user)
-            user_data = UserSerializer(user).data
-            token = Token.objects.create(user=user)
-            return Response({'result': 'ok', 'params': {'token': token.key, 'user': user_data}}, status=status.HTTP_200_OK)
+        if request.data['is_teacher']:
+            studying_directions_names = request.data['studying_directions']
+            studying_directions = StudyDirection.objects.filter(name__in=studying_directions_names)
+            user.save()
+            teacher = Teacher.objects.create(user=user,
+                                             first_name=request.data['first_name'],
+                                             last_name=request.data['last_name'],
+                                             middle_name=request.data['middle_name'],
+                                             departments=[])
+            teacher.save()
+            for direction in studying_directions:
+                teacher.studying_directions.add(direction)
+
+        elif request.data['is_student']:
+            # Студент уже создан - осталось привязать к нему нового пользователя
+            ticket_number = request.data['ticket_number']
+            try:
+                student = Student.objects.get(ticket_number=ticket_number,
+                                              first_name=request.data['first_name'],
+                                              last_name=request.data['last_name'],
+                                              middle_name=request.data['middle_name'])
+                user.save()
+                student.user = user
+                student.save()
+            except:
+                return Response({'result': 'error', 'params': {'message': 'Нет студента с такими данными'}})
+
+        user_data = UserSerializer(user).data
+        token = Token.objects.create(user=user)
+        return Response({'result': 'ok', 'params': {'token': token.key, 'user': user_data}})
 
 
 class UserInfoView(views.APIView):
 
+    def put(self, request, *args, **kwargs):
+        user = request.user
+        serializer = ChangePasswordSerializer(data=request.data)
+
+        if serializer.is_valid():
+            old_password = serializer.data.get("old_password")
+            new_password = serializer.data.get('new_password')
+            new_password_2 = serializer.data.get('new_password_2')
+            if not old_password or not new_password or not new_password_2:
+                return Response({'result': 'error', 'params': {'message': 'Не все поля заполнены'}})
+            if not user.check_password(old_password):
+                return Response({'result': 'error', 'params': {'message': 'Старый пароль указан неверно'}})
+            if not (new_password == new_password_2):
+                return Response({'result': 'ok', 'params': {'message': 'Пароли не совпадают'}})
+            user.set_password(serializer.data.get("new_password"))
+            user.save()
+            return Response({'result': 'ok'})
+        return Response({'result': 'error', 'params': {'message': serializer.errors}})
+
     def post(self, request, format=None):
-        token = request.data['token']
-        user = Token.objects.get(key=token).user
-        user_data = UserSerializer(user).data
-        return Response({'user': user_data})
+        try:
+            user = request.user
+        except:
+            return Response({'result': 'error', 'params': {'message': 'User with this token does not exist'}})
+
+        if request.data['action'] == 'fetch_user_data':
+            user_data = UserSerializer(user).data
+            return Response({'result': 'ok', 'params': {'user': user_data}})
+
+        if request.data['action'] == 'get_info_for_edit':
+            if user.is_student:
+                student = user.student
+                group_number = student.group_number()
+                return Response({'result': 'ok', 'params': {'status': 'student', 'group_number': group_number}})
+            if user.is_teacher:
+                teacher = user.teacher
+                teacher_departments = teacher.departments
+                all_faculties_data = FacultySerializer(Faculty.objects.all(), many=True,
+                                                       fields=['id', 'name', 'directions_names_on_faculty']).data
+                return Response({'result': 'ok', 'params': {'status': 'teacher',
+                                                            'teacher_departments': teacher_departments,
+                                                            'all_faculties': all_faculties_data}})
+
+        if request.data['action'] == 'add_department':
+            teacher = user.teacher
+            department_to_add = request.data['params']['department_name']
+            if department_to_add not in teacher.departments:
+                teacher.departments.append(department_to_add)
+            teacher.save()
+            return Response({'result': 'ok', 'params': {'teacher_departments': teacher.departments}})
+
+        if request.data['action'] == 'delete_department':
+            teacher = user.teacher
+            department_to_delete = request.data['params']['department_name']
+            if department_to_delete in teacher.departments:
+                teacher.departments.remove(department_to_delete)
+            teacher.save()
+            return Response({'result': 'ok', 'params': {'teacher_departments': teacher.departments}})
+
+        if request.data['action'] == 'update_profile':
+            teacher = user.teacher
+            update_type = request.data['params']['type']
+            teacher.studying_directions.clear()
+            if update_type == 'change_faculty':
+                faculty_name = request.data['params']['faculty_name']
+                new_directions = StudyDirection.objects.filter(faculty__name=faculty_name)
+            if update_type == 'change_directions':
+                studying_directions = request.data['params']['directions_names']
+                directions_names = [direction['name'] for direction in studying_directions]
+                new_directions = StudyDirection.objects.filter(name__in=directions_names)
+            for direction in new_directions:
+                teacher.studying_directions.add(direction)
+            teacher.save()
+            return Response({'result': 'ok'})
 
 
 class GroupsByDirectView(views.APIView):
@@ -179,38 +263,47 @@ class TableCreatorView(views.APIView):
 
     def post(self, request, format=None):
         user = request.user
-        if request.data['action'] == 'get_directions':
+        if request.data['action'] == 'get_directs_and_departments':
             try:
                 teacher = Teacher.objects.get(user=user)
             except:
                 Response({'result': 'error', 'params': {'message': 'Ошибка авторизации'}})
             try:
                 teacher_directs = StudyDirection.objects.filter(teacher=teacher)
-            except: Response({'result': 'error', 'params': {'message': 'Не указаны направления подготовки'}})
+            except:
+                Response({'result': 'error', 'params': {'message': 'Не указаны направления подготовки'}})
             serializer = StudyDirectionSerializer(teacher_directs, many=True, fields=['name'])
             all_group_numbers = [group.number for group in Group.objects.all()]
-            return Response({'result': 'ok', 'params': {'directions_names': serializer.data, 'all_group_numbers': all_group_numbers}})
+            return Response(
+                {'result': 'ok', 'params': {'directions_names': serializer.data, 'all_group_numbers': all_group_numbers,
+                                            'teacher_departments': teacher.departments}})
 
         if request.data['action'] == 'create_new':
             table_group_number = request.data['params']['group_number']
             table_name = request.data['params']['new_table_name']
-            table_author = Teacher.objects.get(user=user)
+            table_department = request.data['params']['table_department']
+            table_author = user.teacher
             table_group = Group.objects.get(number=table_group_number)
-            new_table = Table.objects.create(table_name=table_name, table_group=table_group, table_teacher=table_author)
+            new_table = Table.objects.create(table_name=table_name, table_group=table_group, table_teacher=table_author,
+                                             table_department=table_department)
+            if table_department not in table_author.departments:
+                table_author.departments.append(table_department)
+            table_author.save()
             new_table.save()
             students_in_table = table_group.students_in_group()
             for student in students_in_table:
-                final_grade = Grade.objects.create(grade_student=student, grade_table=new_table, grade_type='\u05C4Итог',
+                final_grade = Grade.objects.create(grade_student=student, grade_table=new_table,
+                                                   grade_type='\u05C4Итог',
                                                    grade_value=None)
             table_data = TableSerializer(new_table, fields=['id', 'students_and_grades', 'grades_types']).data
             return Response({'result': 'ok', 'params': {'table_data': table_data}})
 
         if request.data['action'] == 'get_all':
-            table_author = Teacher.objects.get(user=user)
+            table_author = user.teacher
             all_author_tables = Table.objects.filter(table_teacher=table_author)
             serializer = TableSerializer(all_author_tables, many=True, fields=['id', 'table_name', 'table_direction',
                                                                                'table_group_number', 'table_created_at',
-                                                                               'table_updated_at'])
+                                                                               'table_updated_at', 'table_department'])
             return Response({'result': 'ok', 'params': {'all_author_tables': serializer.data}})
 
         if request.data['action'] == 'delete_table':
@@ -275,3 +368,22 @@ class TableCreatorView(views.APIView):
             response = HttpResponse(FileWrapper(document), content_type='application/vnd.ms-excel')
             response['Content-Disposition'] = 'attachment; filename="{}.xls"'.format(new_document_name)
             return response
+
+
+class TableViewerView(views.APIView):
+
+    def post(self, request, *args, **kwargs):
+        user = request.user
+        if request.data['action'] == 'get_all_group_tables':
+            student_group = user.student.student_group
+            all_group_tables = Table.objects.filter(table_group=student_group)
+            serializer = TableSerializer(all_group_tables, many=True, fields=['id', 'table_name', 'table_teacher',
+                                                                              'table_updated_at'])
+            return Response(
+                {'result': 'ok', 'params': {'group_number': student_group.number, 'all_group_tables': serializer.data}})
+
+        if request.data['action'] == 'get_group_table_instance':
+            table_id = request.data['params']['table_id']
+            table = Table.objects.get(id=table_id)
+            table_data = TableSerializer(table, fields=['id', 'table_name', 'students_and_grades', 'grades_types']).data
+            return Response({'result': 'ok', 'params': {'table_data': table_data}})

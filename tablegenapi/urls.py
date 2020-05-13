@@ -21,4 +21,6 @@ urlpatterns = [
 
     path('table_creator/<int:table_id>/', TableCreatorView.as_view()),
     path('table_creator/', TableCreatorView.as_view()),
+
+    path('table_viewer/', TableViewerView.as_view()),
 ]

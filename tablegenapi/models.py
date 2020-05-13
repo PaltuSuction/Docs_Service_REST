@@ -1,3 +1,4 @@
+from django.contrib.postgres.fields import ArrayField
 from django.db import models
 
 # Create your models here.
@@ -10,46 +11,53 @@ from tablegenapi.UserModel import User
 
 class Student(models.Model):
     user = models.OneToOneField(User, on_delete=models.SET_NULL, null=True, blank=True)
+    first_name = models.CharField(max_length=30, blank=True)
+    middle_name = models.CharField(max_length=30, blank=True)
+    last_name = models.CharField(max_length=30, blank=True)
     student_group = models.ForeignKey('Group', on_delete=models.SET_NULL, verbose_name='Группа', null=True)
     ticket_number = models.CharField(max_length=20)
 
     class Meta:
         verbose_name = 'Студент'
         verbose_name_plural = 'Студенты'
-        ordering = ['user__last_name']
+        ordering = ['last_name', 'first_name', 'middle_name']
 
     def group_number(self):
         group_number = self.student_group.number
         return group_number
 
-    def first_name(self):
+'''    def first_name(self):
         return self.user.first_name
 
     def middle_name(self):
         return self.user.middle_name
 
     def last_name(self):
-        return self.user.last_name
+        return self.user.last_name'''
 
 
 class Teacher(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, null=True, blank=True)
+    first_name = models.CharField(max_length=30, blank=True)
+    middle_name = models.CharField(max_length=30, blank=True)
+    last_name = models.CharField(max_length=30, blank=True)
     studying_directions = models.ManyToManyField('StudyDirection', verbose_name='Направления подготовки',
                                                  help_text='Направления подготовки', blank=True)
+    departments = ArrayField(models.CharField(max_length=100), verbose_name='Кафедры преподавателя', size=1, null=True)
 
     class Meta:
         verbose_name = 'Преподаватель'
         verbose_name_plural = 'Преподаватели'
         abstract = False
 
-    def first_name(self):
+    ''' def first_name(self):
         return self.user.first_name
 
     def middle_name(self):
         return self.user.middle_name
 
     def last_name(self):
-        return self.user.last_name
+        return self.user.last_name'''
 
     def directions_names(self):
         names = []
@@ -57,6 +65,10 @@ class Teacher(models.Model):
         for direction in directions:
             names.append(direction.name)
         return names
+
+    def faculty(self):
+        direction = StudyDirection.objects.filter(teacher=self).first()
+        return direction.faculty
 
 
 class Group(models.Model):
@@ -153,6 +165,7 @@ class Table(models.Model):
     # table_discipline = models.ForeignKey('Discipline', on_delete=models.CASCADE, verbose_name='Дисциплина для таблицы',
     #                                      null=True)
     table_teacher = models.ForeignKey('Teacher', on_delete=models.CASCADE, verbose_name='Создатель таблицы')
+    table_department = models.CharField(max_length=100, verbose_name='Кафедра таблицы', null=True)
     table_created_at = models.DateTimeField(editable=False)
     table_updated_at = models.DateTimeField()
 
@@ -189,7 +202,7 @@ class Table(models.Model):
                         student_grades_data[grade_type].append({'id': grade.id, 'grade_value': grade.grade_value})
 
             data.append({'id': student.id,
-                         'fio': student.user.last_name + ' ' + student.user.first_name + ' ' + student.user.middle_name,
+                         'fio': student.last_name + ' ' + student.first_name + ' ' + student.middle_name,
                          'grades': student_grades_data})
         return data
 
