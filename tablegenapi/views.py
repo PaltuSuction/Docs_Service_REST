@@ -258,7 +258,7 @@ class TableCreatorView(views.APIView):
 
     def get(self, request, table_id):
         table = Table.objects.get(id=table_id)
-        table_data = TableSerializer(table, fields=['id', 'students_and_grades', 'grades_types']).data
+        table_data = TableSerializer(table, fields=['id', 'table_name', 'table_group_number', 'students_and_grades', 'grades_types']).data
         return Response({'result': 'ok', 'params': {'table_data': table_data}})
 
     def post(self, request, format=None):
@@ -295,7 +295,7 @@ class TableCreatorView(views.APIView):
                 final_grade = Grade.objects.create(grade_student=student, grade_table=new_table,
                                                    grade_type='\u05C4Итог',
                                                    grade_value=None)
-            table_data = TableSerializer(new_table, fields=['id', 'students_and_grades', 'grades_types']).data
+            table_data = TableSerializer(new_table, fields=['id', 'table_name', 'table_group_number', 'students_and_grades', 'grades_types']).data
             return Response({'result': 'ok', 'params': {'table_data': table_data}})
 
         if request.data['action'] == 'get_all':
